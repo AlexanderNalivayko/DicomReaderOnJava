@@ -5,6 +5,8 @@ import com.jogamp.opengl.util.gl2.GLUT;
 import ij.plugin.DICOM;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
 import java.awt.image.DataBufferByte;
@@ -49,13 +51,13 @@ public class OpenGL extends GLCanvas implements GLEventListener {
         glcanvas.repaint();
         OpenGL m = new OpenGL();
         glcanvas.addGLEventListener(m);
-        glcanvas.setSize(columns *2, rows *2);
+        glcanvas.setSize(columns, rows);
         glcanvas.addMouseMotionListener(new Move());
         final JFrame frame = new JFrame("DicomImage");
         frame.getContentPane().setLayout(null);
         frame.getContentPane().add(glcanvas);
         frame.getContentPane().setBackground(new Color(0,0,0));
-        frame.setSize(columns *2, rows *2);
+        frame.setSize(columns, rows);
         frame.setLocationRelativeTo(null);
         frame.setUndecorated(true);
         frame.setVisible(true);
@@ -76,20 +78,20 @@ public class OpenGL extends GLCanvas implements GLEventListener {
         try {handleTheTexture(gl);}
         catch (FileNotFoundException e) {e.printStackTrace();}
         letsDraw(gl);
-        printMouseCoordinates();
+        //printMouseCoordinates();
     }
 
     private static void letsDraw(final GL2 gl) {
 
         gl.glBegin(GL2.GL_QUADS);
         gl.glTexCoord2d(0, 1);
-        gl.glVertex3d(-columns, 0, 0);
+        gl.glVertex3d(-columns, -rows, 0);
         gl.glTexCoord2d(0, 0);
         gl.glVertex3d(-columns, rows, 0);
         gl.glTexCoord2d(1, 0);
-        gl.glVertex3d(0, rows, 0);
+        gl.glVertex3d(columns, rows, 0);
         gl.glTexCoord2d(1, 1);
-        gl.glVertex3d(0, 0, 0);
+        gl.glVertex3d(columns, -rows, 0);
         gl.glEnd();
         gl.glFlush();
         gl.glDisable(GL2.GL_TEXTURE_2D);
@@ -127,7 +129,8 @@ public class OpenGL extends GLCanvas implements GLEventListener {
     private void handleTheTexture(final GL2 gl) throws FileNotFoundException {
 
         if (bitsAloc == 8) {
-            byte[] data = ((DataBufferByte) dcm.getBufferedImage().getData().getDataBuffer()).getData();
+            //byte[] data = ((DataBufferByte) dcm.getBufferedImage().getData().getDataBuffer()).getData();
+            byte[] data = createMask();
             ByteBuffer buffer = ByteBuffer.allocate(columns * rows);
             ByteBuffer wrapArray = buffer.wrap(data, 0, columns * rows);
             gl.glPixelStorei(GL2.GL_UNPACK_ALIGNMENT, 1);
@@ -146,14 +149,26 @@ public class OpenGL extends GLCanvas implements GLEventListener {
         }
     }
 
+    public static byte[] createMask(){
+        byte[] mask = new byte[columns*rows];
+        for (int i = 0; i < mask.length; i++) {
+            if (rows-((i)% rows) >= ((i)/rows)){
+                mask[i] = (byte)255;
+            }else {
+                mask[i] = 0;
+            }
+        }
+        return mask;
+    }
+
     public static void glWrite(float x, float y, int font, String txt, int kls) {
         gl.glColor3f(0f,1f,0f);
         char[] text = txt.toCharArray();
         gl.glRasterPos2f(x, y);
         for (int i=0; i<kls; i++)
             glut.glutBitmapCharacter(font, text[i]);
-        writeLetters(rightLetters, 0);
-        writeLetters(bottomLetters, 1);
+        //writeLetters(rightLetters, 0);
+        //writeLetters(bottomLetters, 1);
     }
 
     public static void composeLetters(){
@@ -198,13 +213,8 @@ public class OpenGL extends GLCanvas implements GLEventListener {
     }
 
     public static void printMouseCoordinates() {
-
         if (cX<rows && cY<columns) {
-            //cX = mouseX*2/512-1;
-            //cY = mouseY*2/512;
-            //double x = imagePosition[0] + pixelSpacing[1] * columns * (imageOrientation[0] * cX) + rows * (imageOrientation[3] * cY);
             double x = imagePosition[0] + (mouseX * pixelSpacing[1] * imageOrientation[4]);
-            //double y = imagePosition[1] + pixelSpacing[0] * rows * (imageOrientation[4] * cY) + columns * (imageOrientation[1] * cX);
             double y = imagePosition[1] + (mouseY * pixelSpacing[0] * imageOrientation[0]);
             double z = imagePosition[2] + mouseX * imageOrientation[2] + mouseY * imageOrientation[5];
 
@@ -222,19 +232,35 @@ public class OpenGL extends GLCanvas implements GLEventListener {
 
     public void init(GLAutoDrawable gLDrawable) {}
 
-    private static class Move implements MouseMotionListener{
+    private static class KeyBoard implements KeyListener{
+        @Override
+        public void keyTyped(KeyEvent e) {
 
+        }
+
+        @Override
+        public void keyPressed(KeyEvent e) {
+
+        }
+
+        @Override
+        public void keyReleased(KeyEvent e) {
+
+        }
+    }
+
+    private static class Move implements MouseMotionListener{
         @Override
         public void mouseDragged(MouseEvent e) {}
 
         @Override
         public void mouseMoved(MouseEvent e) {
-            cX = e.getX();
-            cY = e.getY();
-            mouseX = -(rows - e.getX());
-            mouseY = columns - e.getY();
-            printMouseCoordinates();
-            glcanvas.repaint();
+            //cX = e.getX();
+            //cY = e.getY();
+            //mouseX = -(rows - e.getX());
+            //mouseY = columns - e.getY();
+            //printMouseCoordinates();
+            //glcanvas.repaint();
         }
     }
 
