@@ -38,6 +38,9 @@ public class OpenGL extends GLCanvas implements GLEventListener {
     static double cY;
     static String rightLetters;
     static String bottomLetters;
+    static byte[] data;
+    static byte[] mask;
+    static byte[] dataRGBA;
 
     public static void main(String[] args) {
         try {
@@ -53,6 +56,7 @@ public class OpenGL extends GLCanvas implements GLEventListener {
         glcanvas.addGLEventListener(m);
         glcanvas.setSize(columns, rows);
         glcanvas.addMouseMotionListener(new Move());
+        glcanvas.addKeyListener(new KeyBoard());
         final JFrame frame = new JFrame("DicomImage");
         frame.getContentPane().setLayout(null);
         frame.getContentPane().add(glcanvas);
@@ -123,14 +127,13 @@ public class OpenGL extends GLCanvas implements GLEventListener {
         bitsAloc = Integer.parseInt((dcm.getStringProperty("0028,0100")).trim());
         rows = Integer.parseInt((dcm.getStringProperty("0028,0010")).trim());
         columns = Integer.parseInt((dcm.getStringProperty("0028,0011")).trim());
-        composeLetters();
+        data = ((DataBufferByte) dcm.getBufferedImage().getData().getDataBuffer()).getData();
+        //composeLetters();
     }
 
     private void handleTheTexture(final GL2 gl) throws FileNotFoundException {
 
         if (bitsAloc == 8) {
-            //byte[] data = ((DataBufferByte) dcm.getBufferedImage().getData().getDataBuffer()).getData();
-            byte[] data = createMask();
             ByteBuffer buffer = ByteBuffer.allocate(columns * rows);
             ByteBuffer wrapArray = buffer.wrap(data, 0, columns * rows);
             gl.glPixelStorei(GL2.GL_UNPACK_ALIGNMENT, 1);
@@ -145,7 +148,31 @@ public class OpenGL extends GLCanvas implements GLEventListener {
             gl.glActiveTexture(GL2.GL_TEXTURE0);
             gl.glEnable(GL2.GL_TEXTURE_2D);
         } else {
-            System.out.println("Error. BitsAllocated=16 is not supported.");
+            monoToRGBA();
+            ByteBuffer buffer = ByteBuffer.allocate(columns * rows * 4);
+            ByteBuffer wrapArray = buffer.wrap(dataRGBA, 0, columns * rows * 4);
+            gl.glPixelStorei(GL2.GL_UNPACK_ALIGNMENT, 1);
+            final int[] textureID = new int[1];
+            gl.glGenTextures(1, textureID, 0);
+            gl.glBindTexture(GL2.GL_TEXTURE_2D, textureID[0]);
+            gl.glTexParameteri(GL2.GL_TEXTURE_2D, GL2.GL_TEXTURE_MAG_FILTER, GL2.GL_LINEAR);
+            gl.glTexParameteri(GL2.GL_TEXTURE_2D, GL2.GL_TEXTURE_MIN_FILTER, GL2.GL_LINEAR);
+            gl.glTexEnvf(GL2.GL_TEXTURE_ENV, GL2.GL_TEXTURE_ENV_MODE, GL2.GL_REPLACE);
+            gl.glTexImage2D(GL2.GL_TEXTURE_2D, 0, GL2.GL_RGBA, columns, rows, 0, GL2.GL_RGBA,
+                    GL2.GL_UNSIGNED_BYTE, wrapArray);
+            gl.glActiveTexture(GL2.GL_TEXTURE0);
+            gl.glEnable(GL2.GL_TEXTURE_2D);
+        }
+    }
+
+    public static void monoToRGBA(){
+        data = ((DataBufferByte) dcm.getBufferedImage().getData().getDataBuffer()).getData();
+        dataRGBA = new byte[columns * rows * 4];
+        for (int i = 4; i < dataRGBA.length; i+=4) {
+            dataRGBA[i-4]=0;
+            dataRGBA[i-3]=data[(i/4)-1];;
+            dataRGBA[i-2]=0;
+            dataRGBA[i-1]=0;
         }
     }
 
@@ -240,7 +267,27 @@ public class OpenGL extends GLCanvas implements GLEventListener {
 
         @Override
         public void keyPressed(KeyEvent e) {
-
+            if(e.getKeyCode()== KeyEvent.VK_1 | e.getKeyCode() == KeyEvent.VK_NUMPAD1){
+                bitsAloc = 8;
+                data = ((DataBufferByte) dcm.getBufferedImage().getData().getDataBuffer()).getData();
+                glcanvas.repaint();
+            }else if(e.getKeyCode()== KeyEvent.VK_2 | e.getKeyCode() == KeyEvent.VK_NUMPAD2){
+                bitsAloc = 8;
+                mask = createMask();
+                data = ((DataBufferByte) dcm.getBufferedImage().getData().getDataBuffer()).getData();
+                for (int i = 0; i < data.length; i++) {
+                    data[i] = (byte)(data[i] & mask[i]);
+                }
+                glcanvas.repaint();
+            }else if(e.getKeyCode()== KeyEvent.VK_3 | e.getKeyCode() == KeyEvent.VK_NUMPAD3){
+                bitsAloc = 16;
+                glcanvas.repaint();
+            }else if (e.getKeyCode() == KeyEvent.VK_ESCAPE){
+                System.exit(0);
+            }else if (e.getKeyCode()== KeyEvent.VK_4 | e.getKeyCode() == KeyEvent.VK_NUMPAD4) {
+                bitsAloc = 16;
+                glcanvas.repaint();
+            }
         }
 
         @Override
