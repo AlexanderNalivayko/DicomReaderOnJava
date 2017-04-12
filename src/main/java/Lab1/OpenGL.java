@@ -1,3 +1,5 @@
+package Lab1;
+
 import com.jogamp.opengl.*;
 import com.jogamp.opengl.awt.GLCanvas;
 import com.jogamp.opengl.glu.GLU;
@@ -41,6 +43,13 @@ public class OpenGL extends GLCanvas implements GLEventListener {
     static byte[] data;
     static byte[] mask;
     static byte[] dataRGBA;
+    static JTextField tf1;
+    static JTextField tf2;
+    static boolean mirroring = false;
+    static boolean scaling = false;
+    static boolean isScaled = false;
+    static int y = 0;
+    static double Sy = 0;
 
     public static void main(String[] args) {
         try {
@@ -54,17 +63,34 @@ public class OpenGL extends GLCanvas implements GLEventListener {
         glcanvas.repaint();
         OpenGL m = new OpenGL();
         glcanvas.addGLEventListener(m);
-        glcanvas.setSize(columns, rows);
+        glcanvas.setSize(columns*2, rows*2);
         glcanvas.addMouseMotionListener(new Move());
         glcanvas.addKeyListener(new KeyBoard());
         glcanvas.setFocusable(true);
         final JFrame frame = new JFrame("DicomImage");
-        frame.getContentPane().setLayout(null);
+
+        frame.getContentPane().setLayout(new FlowLayout());
         frame.getContentPane().add(glcanvas);
+
+        JLabel label1 = new JLabel("y:");
+        label1.setForeground(Color.white);
+        JLabel label2 = new JLabel("Sy:");
+        label2.setForeground(Color.white);
+
+        tf1 = new JTextField();
+        tf1.setColumns(3);
+        tf2 = new JTextField();
+        tf2.setColumns(3);
+
+        frame.add(label1);
+        frame.add(tf1);
+        frame.add(label2);
+        frame.add(tf2);
+
         frame.getContentPane().setBackground(new Color(0,0,0));
-        frame.setSize(columns, rows);
+        frame.setSize(columns*2, rows*2+70);
         frame.setLocationRelativeTo(null);
-        frame.setUndecorated(true);
+        //frame.setUndecorated(true);
         frame.setVisible(true);
         frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
     }
@@ -75,11 +101,10 @@ public class OpenGL extends GLCanvas implements GLEventListener {
         GLU glu = new GLU();
         gl = gLDrawable.getGL().getGL2();
         gl.glClear(GL2.GL_COLOR_BUFFER_BIT | GL2.GL_DEPTH_BUFFER_BIT);
+
         gl.glLoadIdentity();
         gl.glClearColor(0, 0, 0, 1);
-        GLContext gLContext = glcanvas.getContext();
-        gLContext.makeCurrent();
-        glu.gluOrtho2D(-columns, columns , -rows, rows );
+        glu.gluOrtho2D(-columns,  columns , -rows, rows);
         try {handleTheTexture(gl);}
         catch (FileNotFoundException e) {e.printStackTrace();}
         letsDraw(gl);
@@ -90,21 +115,21 @@ public class OpenGL extends GLCanvas implements GLEventListener {
 
         gl.glBegin(GL2.GL_QUADS);
         gl.glTexCoord2d(0, 1);
-        gl.glVertex3d(-columns, -rows, 0);
+        gl.glVertex3d(0, 0, 0);
         gl.glTexCoord2d(0, 0);
-        gl.glVertex3d(-columns, rows, 0);
+        gl.glVertex3d(0, rows, 0);
         gl.glTexCoord2d(1, 0);
         gl.glVertex3d(columns, rows, 0);
         gl.glTexCoord2d(1, 1);
-        gl.glVertex3d(columns, -rows, 0);
+        gl.glVertex3d(columns, 0, 0);
         gl.glEnd();
         gl.glFlush();
         gl.glDisable(GL2.GL_TEXTURE_2D);
     }
 
     private static void loadTexture() throws FileNotFoundException {
-        dcm = new DICOM(new FileInputStream(new File("dcm2.dcm")));
-        dcm.run("dcm1.dcm");
+        dcm = new DICOM(new FileInputStream(new File("DICOM_Image_for_Lab_2.dcm")));
+        dcm.run("DICOM_Image_for_Lab_2.dcm");
         study_id = dcm.getStringProperty("0020,0010");
         String s = dcm.getStringProperty("0020,0037");//image orientation
         System.out.println(s);
@@ -118,11 +143,11 @@ public class OpenGL extends GLCanvas implements GLEventListener {
         for (int i = 0; i < str.length; i++) {
             imagePosition[i] = Double.parseDouble(str[i].trim());
         }
-        s = dcm.getStringProperty("0028,0030");//image position
-        str = s.split("\\\\");
-        for (int i = 0; i < str.length; i++) {
-            pixelSpacing[i] = Double.parseDouble(str[i].trim());
-        }
+        //s = dcm.getStringProperty("0028,0030");//image position
+        //str = s.split("\\\\");
+        //for (int i = 0; i < str.length; i++) {
+        //    pixelSpacing[i] = Double.parseDouble(str[i].trim());
+        //}
         patientPosition = dcm.getStringProperty("0018,5100");
         System.out.println(patientPosition);
         bitsAloc = Integer.parseInt((dcm.getStringProperty("0028,0100")).trim());
@@ -148,6 +173,23 @@ public class OpenGL extends GLCanvas implements GLEventListener {
                     GL2.GL_UNSIGNED_BYTE, wrapArray);
             gl.glActiveTexture(GL2.GL_TEXTURE0);
             gl.glEnable(GL2.GL_TEXTURE_2D);
+            if(mirroring){
+                gl.glScaled(-1,1,1);
+            }else{
+                gl.glScaled(1,1,1);
+            }
+            if(scaling){
+                getTfData();
+                gl.glTranslated(0,y,0);
+                gl.glScaled(1, Sy, 1);
+                gl.glTranslated(0,-y,0);
+                isScaled = true;
+            }else if(!scaling & isScaled){
+                gl.glTranslated(0,y,0);
+                gl.glScaled(1, 1, 1);
+                gl.glTranslated(0,-y,0);
+                isScaled = false;
+            }
         } else {
             ByteBuffer buffer = ByteBuffer.allocate(columns * rows * 4);
             ByteBuffer wrapArray = buffer.wrap(dataRGBA, 0, columns * rows * 4);
@@ -162,6 +204,11 @@ public class OpenGL extends GLCanvas implements GLEventListener {
                     GL2.GL_UNSIGNED_BYTE, wrapArray);
             gl.glActiveTexture(GL2.GL_TEXTURE0);
             gl.glEnable(GL2.GL_TEXTURE_2D);
+            if(mirroring){
+                gl.glScaled(-1,1,1);
+            }else{
+                gl.glScaled(1,1,1);
+            }
         }
     }
 
@@ -170,35 +217,18 @@ public class OpenGL extends GLCanvas implements GLEventListener {
         dataRGBA = new byte[columns * rows * 4];
         for (int i = 4; i < dataRGBA.length; i+=4) {
             dataRGBA[i-4]=0;
-            dataRGBA[i-3]=data[(i/4)-1];;
+            dataRGBA[i-3]=data[(i/4)-1];
             dataRGBA[i-2]=0;
             dataRGBA[i-1]=0;
         }
     }
 
-    public static void monoToRGBAInvert(){
-        data = ((DataBufferByte) dcm.getBufferedImage().getData().getDataBuffer()).getData();
-        dataRGBA = new byte[columns * rows * 4];
-        for (int i = 4; i < dataRGBA.length; i+=4) {
-            dataRGBA[i-4]=0;
-            dataRGBA[i-3]=(byte)(255-(data[(i/4)-1]));
-            dataRGBA[i-2]=0;
-            dataRGBA[i-1]=0;
-        }
-    }
-
-    public static void monoToRGBAGrad(){
-        data = ((DataBufferByte) dcm.getBufferedImage().getData().getDataBuffer()).getData();
-        dataRGBA = new byte[columns * rows * 4];
-        for (int i = 4; i < dataRGBA.length; i+=4) {
-            dataRGBA[i-4]=0;
-            if (data[(i/4)-1]<127) {
-                dataRGBA[i - 3] = (byte) ((data[(i / 4) - 1])*2);
-            }else {
-                dataRGBA[i - 3] = (byte) ((255 - (data[(i / 4) - 1]))*2);
-            }
-            dataRGBA[i-2]=0;
-            dataRGBA[i-1]=0;
+    public static void getTfData(){
+        try{
+            y = Integer.parseInt(tf1.getText());
+            Sy = Double.parseDouble(tf2.getText());
+        }catch (Exception e){
+            e.printStackTrace();
         }
     }
 
@@ -300,7 +330,7 @@ public class OpenGL extends GLCanvas implements GLEventListener {
                 mask = createMask();
                 data = ((DataBufferByte) dcm.getBufferedImage().getData().getDataBuffer()).getData();
                 for (int i = 0; i < data.length; i++) {
-                    data[i] = (byte)( mask[i]);
+                    data[i] = (byte)(data[i]&mask[i]);
                 }
                 glcanvas.repaint();
             }else if(e.getKeyCode()== KeyEvent.VK_3 | e.getKeyCode() == KeyEvent.VK_NUMPAD3){
@@ -309,13 +339,20 @@ public class OpenGL extends GLCanvas implements GLEventListener {
                 glcanvas.repaint();
             }else if (e.getKeyCode() == KeyEvent.VK_ESCAPE){
                 System.exit(0);
-            }else if (e.getKeyCode()== KeyEvent.VK_4 | e.getKeyCode() == KeyEvent.VK_NUMPAD4) {
-                bitsAloc = 16;
-                monoToRGBAInvert();
+            }else if(e.getKeyCode()==KeyEvent.VK_Z){
+                if(mirroring){
+                    mirroring = false;
+                }else {
+                    mirroring = true;
+                }
                 glcanvas.repaint();
-            }else if (e.getKeyCode()== KeyEvent.VK_5 | e.getKeyCode() == KeyEvent.VK_NUMPAD5) {
-                bitsAloc = 16;
-                monoToRGBAGrad();
+            }else if(e.getKeyCode()==KeyEvent.VK_X){
+                //TODO маштабирование
+                if(scaling){
+                    scaling = false;
+                }else {
+                    scaling = true;
+                }
                 glcanvas.repaint();
             }
         }
